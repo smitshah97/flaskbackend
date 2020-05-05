@@ -50,7 +50,8 @@ from nltk.stem.snowball import SnowballStemmer
 from kmodes.kmodes import KModes
 #from . import db 
 #from .models import Movie
-from flask_cors import CORS, cross_originfrom datetime import timedelta
+from flask_cors import CORS, cross_origin
+from datetime import timedelta
 from flask import make_response, request, current_app
 from functools import update_wrapper
 
