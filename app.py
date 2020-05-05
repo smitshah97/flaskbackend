@@ -60,7 +60,7 @@ from functools import update_wrapper
 application=app = Flask(__name__)
 app.before_request(bind_request_params)
 
-CORS(app)
+cors = CORS(app, resources={r"/execute_clusteringopearation": {"origins": "http://13.232.254.221:80"}})
 app.config['CORS_HEADERS'] = 'Content-Type'
 
 
