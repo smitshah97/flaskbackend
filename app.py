@@ -861,7 +861,7 @@ def fetchclassificationmodel():
 
 
 @app.route("/execute_clusteringoperation", methods=['POST']) 
-@cross_origin()
+@crossdomain(origin='*')
 def executeclustering():
     if request.method=="POST":
         if request.files:
