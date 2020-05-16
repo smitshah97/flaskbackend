@@ -524,6 +524,407 @@ def executeregression():
         db_cm2.insert({"User":"Smit","data":data_dict,"s":s1,"regressionmodel":regressionmodel},check_keys=False)
     return a
 
+@app.route("/editregressionmodel", methods=['POST']) 
+@cross_origin()
+def editregressionmodel():
+    a="REGRESSION EDITED SUCCESSFULLY"
+    if request.method=="GET":
+        data = request.get_json(silent=True)
+        item = {'values': data.get('values')}
+        print(item)
+        mng_client1 = pymongo.MongoClient("mongodb+srv://expertron:smitenter@cluster0-dpwn4.mongodb.net/test?retryWrites=true&w=majority")
+        mng_db1 = mng_client1['ampleai'] 
+        collection_name1 = 'csv' 
+        db_cm1 = mng_db1[collection_name1]
+        data_from_db = db_cm1.find_one({"User":"Smit"})
+        s=data_from_db["s"]
+        dictfromdatabase=data_from_db["data"]
+        df2=pd.DataFrame.from_dict(dictfromdatabase)
+        regressionmodel=data_from_db["regressionmodel"]
+        editmodeltype=item["values"]["selecttype"]
+        multiplemodels=item["values"]["select-multiple"]
+        if editmodeltype=="Individual":
+            regressionmodel["Ensemble"]="No"
+        else:
+            regressionmodel["Ensemble"]="Yes"
+        
+        selectedtarget=regressionmodel["columnpredicted"]
+        stringcolumnlist=[]
+        objectlist=list(df2.select_dtypes(include=["object"]).columns)
+        stringcolumnlist.extend(objectlist)
+        df2.drop(stringcolumnlist,axis=1,inplace=True)
+        X = df2.drop(selectedtarget,axis=1).values
+        y = df2[selectedtarget].values
+        Xfeature = df2.drop(selectedtarget,axis=1)
+        yfeature = df2[selectedtarget]
+        reg1 = GradientBoostingRegressor(random_state=1, n_estimators=10)
+        reg2 = RandomForestRegressor(random_state=1, n_estimators=10)
+        reg3 = LinearRegression()
+        regensemble = VotingRegressor(estimators=[('gb', reg1), ('rf', reg2), ('lr', reg3)])
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size = 0.2, random_state = 0) 
+        sel = VarianceThreshold(threshold=(.8 * (1 - .8)))
+        sel.fit_transform(X)    
+        lenofX=len(df2.drop(selectedtarget,axis=1).columns)
+        if editmodeltype=="Individual":
+            modelname=item["values"]["select"]
+            if modelname=="RFR":
+                clf2r2scorelist=[]
+                i=2
+                while i<=lenofX:
+                    X_new = SelectKBest(score_func=f_regression, k=i).fit_transform(X, y)
+                    X_new.shape
+                    X_train, X_test, y_train, y_test = train_test_split(X_new, y, test_size = 0.2, random_state = 0)
+                    trainedreg2 = reg2.fit(X_train, y_train)
+                    y_pred = trainedreg2.predict(X_test)
+                    clf2r2scorelist.append(r2_score(y_test, y_pred))
+                    i=i+1
+                largestr2=max(clf2r2scorelist)
+                print(clf2r2scorelist.index(largestr2))
+                Optimalk=clf2r2scorelist.index(largestr2) + 2
+                print(Optimalk)
+                X_new = SelectKBest(score_func=f_regression, k=Optimalk).fit_transform(X, y)
+                print(X_new[0])
+                print(X[0])
+                firstrow=X[0].tolist()
+                print(type(X[0]))
+                Xcolumns=[]
+                for col in Xfeature.columns:
+                    Xcolumns.append(col)
+                print(Xcolumns)
+                featurelist=[]
+                for element in X_new[0]:
+                    print(firstrow.index(element))
+                    featurelist.append(Xcolumns[firstrow.index(element)])
+                print(featurelist)
+                # Predicting model 
+                X_train, X_test, y_train, y_test = train_test_split(X_new, y, test_size = 0.2, random_state = 0)
+                trainedreg1 = reg1.fit(X_train, y_train)
+                y_pred = trainedreg1.predict(X_test)
+                
+                columnpredicted=selectedtarget
+                
+                # Make new Dictionary to sore in database
+                regressionmodel={}
+                regressionmodel["columnpredicted"]=columnpredicted
+                regressionmodel["Ensemble"]="Yes"
+                regressionmodel["Type"]="Voting Regressor"
+                regressionmodel["Estimators"]=["RandomForestRegressor"]
+                regressionmodel["numfeatures"]=Optimalk
+                regressionmodel["featurenames"]=featurelist
+                regressionmodel["featureselection"]=["Variance Threshlod","Univariate Selection"]
+                # Metrics
+                regressionmodel["Explained Variance Score"]=explained_variance_score(y_test, y_pred)
+                regressionmodel["MeanAbsoluteError"]=mean_absolute_error(y_test, y_pred)
+                regressionmodel["MeanSquaredError"]=mean_squared_error(y_test, y_pred)
+                regressionmodel["RootMeanSquaredError"]=mean_squared_error(y_test, y_pred, squared=False)
+                regressionmodel["MeanSquaredLogError"]=mean_squared_log_error(y_test, y_pred)
+                regressionmodel["MedianAbsoluteError"]=median_absolute_error(y_test, y_pred)
+            elif modelname=="GBR":
+                clf1r2scorelist=[]
+                i=2
+                while i<=lenofX:
+                    X_new = SelectKBest(score_func=f_regression, k=i).fit_transform(X, y)
+                    X_new.shape
+                    X_train, X_test, y_train, y_test = train_test_split(X_new, y, test_size = 0.2, random_state = 0)
+                    trainedreg1 = reg1.fit(X_train, y_train)
+                    y_pred = trainedreg1.predict(X_test)
+                    clf1r2scorelist.append(r2_score(y_test, y_pred))
+                    i=i+1
+                largestr2=max(clf1r2scorelist)
+                print(clf1r2scorelist.index(largestr2))
+                Optimalk=clf1r2scorelist.index(largestr2) + 2
+                print(Optimalk)
+                X_new = SelectKBest(score_func=f_regression, k=Optimalk).fit_transform(X, y)
+                print(X_new[0])
+                print(X[0])
+                firstrow=X[0].tolist()
+                print(type(X[0]))
+                Xcolumns=[]
+                for col in Xfeature.columns:
+                    Xcolumns.append(col)
+                print(Xcolumns)
+                featurelist=[]
+                for element in X_new[0]:
+                    print(firstrow.index(element))
+                    featurelist.append(Xcolumns[firstrow.index(element)])
+                print(featurelist)
+                # Predicting model 
+                X_train, X_test, y_train, y_test = train_test_split(X_new, y, test_size = 0.2, random_state = 0)
+                trainedreg1 = reg1.fit(X_train, y_train)
+                y_pred = trainedreg1.predict(X_test)
+                
+                columnpredicted=selectedtarget
+                
+                # Make new Dictionary to sore in database
+                regressionmodel={}
+                regressionmodel["columnpredicted"]=columnpredicted
+                regressionmodel["Ensemble"]="Yes"
+                regressionmodel["Type"]="Voting Regressor"
+                regressionmodel["Estimators"]=["GradientBoostingRegressor"]
+                regressionmodel["numfeatures"]=Optimalk
+                regressionmodel["featurenames"]=featurelist
+                regressionmodel["featureselection"]=["Variance Threshlod","Univariate Selection"]
+                # Metrics
+                regressionmodel["Explained Variance Score"]=explained_variance_score(y_test, y_pred)
+                regressionmodel["MeanAbsoluteError"]=mean_absolute_error(y_test, y_pred)
+                regressionmodel["MeanSquaredError"]=mean_squared_error(y_test, y_pred)
+                regressionmodel["RootMeanSquaredError"]=mean_squared_error(y_test, y_pred, squared=False)
+                regressionmodel["MeanSquaredLogError"]=mean_squared_log_error(y_test, y_pred)
+                regressionmodel["MedianAbsoluteError"]=median_absolute_error(y_test, y_pred)
+            else:
+                clf3r2scorelist=[]
+                i=2
+                while i<=lenofX:
+                    X_new = SelectKBest(score_func=f_regression, k=i).fit_transform(X, y)
+                    X_new.shape
+                    X_train, X_test, y_train, y_test = train_test_split(X_new, y, test_size = 0.2, random_state = 0)
+                    trainedreg3 = reg3.fit(X_train, y_train)
+                    y_pred = trainedreg3.predict(X_test)
+                    clf3r2scorelist.append(r2_score(y_test, y_pred))
+                    i=i+1
+                largestr2=max(clf3r2scorelist)
+                print(clf3r2scorelist.index(largestr2))
+                Optimalk=clf3r2scorelist.index(largestr2) + 2
+                print(Optimalk)
+                X_new = SelectKBest(score_func=f_regression, k=Optimalk).fit_transform(X, y)
+                print(X_new[0])
+                print(X[0])
+                firstrow=X[0].tolist()
+                print(type(X[0]))
+                Xcolumns=[]
+                for col in Xfeature.columns:
+                    Xcolumns.append(col)
+                print(Xcolumns)
+                featurelist=[]
+                for element in X_new[0]:
+                    print(firstrow.index(element))
+                    featurelist.append(Xcolumns[firstrow.index(element)])
+                print(featurelist)
+                # Predicting model 
+                X_train, X_test, y_train, y_test = train_test_split(X_new, y, test_size = 0.2, random_state = 0)
+                trainedreg3 = reg3.fit(X_train, y_train)
+                y_pred = trainedreg3.predict(X_test)
+                
+                columnpredicted=selectedtarget
+                
+                # Make new Dictionary to sore in database
+                regressionmodel={}
+                regressionmodel["columnpredicted"]=columnpredicted
+                regressionmodel["Ensemble"]="Yes"
+                regressionmodel["Type"]="Voting Regressor"
+                regressionmodel["Estimators"]=["LinearRegression"]
+                regressionmodel["numfeatures"]=Optimalk
+                regressionmodel["featurenames"]=featurelist
+                regressionmodel["featureselection"]=["Variance Threshlod","Univariate Selection"]
+                # Metrics
+                regressionmodel["Explained Variance Score"]=explained_variance_score(y_test, y_pred)
+                regressionmodel["MeanAbsoluteError"]=mean_absolute_error(y_test, y_pred)
+                regressionmodel["MeanSquaredError"]=mean_squared_error(y_test, y_pred)
+                regressionmodel["RootMeanSquaredError"]=mean_squared_error(y_test, y_pred, squared=False)
+                regressionmodel["MeanSquaredLogError"]=mean_squared_log_error(y_test, y_pred)
+                regressionmodel["MedianAbsoluteError"]=median_absolute_error(y_test, y_pred)
+            
+            
+        else:
+            if (multiplemodels==["GBR", "RFR"]) or (multiplemodels==["RFR","GBR"]):
+                regensemble = VotingRegressor(estimators=[('gb', reg1), ('rf', reg2)])
+                r2scorelist=[]
+                i=2
+                lenofX=len(df2.drop(selectedtarget,axis=1).columns)
+                while i<=lenofX:
+                    X_new = SelectKBest(score_func=f_regression, k=i).fit_transform(X, y)
+                    X_new.shape
+                    X_train, X_test, y_train, y_test = train_test_split(X_new, y, test_size = 0.2, random_state = 0)
+                    ereg = regensemble.fit(X_train, y_train)
+                    y_pred = ereg.predict(X_test)
+                    r2scorelist.append(r2_score(y_test, y_pred))
+                    i=i+1
+                largestr2=max(r2scorelist)
+                print(r2scorelist.index(largestr2))
+                Optimalk=r2scorelist.index(largestr2) + 2
+                print(Optimalk)
+                X_new = SelectKBest(score_func=f_regression, k=Optimalk).fit_transform(X, y)
+                print(X_new[0])
+                print(X[0])
+                firstrow=X[0].tolist()
+                print(type(X[0]))
+                Xcolumns=[]
+                for col in Xfeature.columns:
+                    Xcolumns.append(col)
+                print(Xcolumns)
+                featurelist=[]
+                for element in X_new[0]:
+                    print(firstrow.index(element))
+                    featurelist.append(Xcolumns[firstrow.index(element)])
+                print(featurelist)
+                # Predicting model 
+                X_train, X_test, y_train, y_test = train_test_split(X_new, y, test_size = 0.2, random_state = 0)
+                ereg = regensemble.fit(X_train, y_train)
+                y_pred = ereg.predict(X_test)
+                
+                columnpredicted=selectedtarget
+                
+                # Make new Dictionary to sore in database
+                regressionmodel={}
+                regressionmodel["columnpredicted"]=columnpredicted
+                regressionmodel["Ensemble"]="Yes"
+                regressionmodel["Type"]="Voting Regressor"
+                regressionmodel["Estimators"]=["GradientBoostingRegressor","RandomForestRegressor"]
+                regressionmodel["numfeatures"]=Optimalk
+                regressionmodel["featurenames"]=featurelist
+                regressionmodel["featureselection"]=["Variance Threshlod","Univariate Selection"]
+                # Metrics
+                regressionmodel["Explained Variance Score"]=explained_variance_score(y_test, y_pred)
+                regressionmodel["MeanAbsoluteError"]=mean_absolute_error(y_test, y_pred)
+                regressionmodel["MeanSquaredError"]=mean_squared_error(y_test, y_pred)
+                regressionmodel["RootMeanSquaredError"]=mean_squared_error(y_test, y_pred, squared=False)
+                regressionmodel["MeanSquaredLogError"]=mean_squared_log_error(y_test, y_pred)
+                regressionmodel["MedianAbsoluteError"]=median_absolute_error(y_test, y_pred)
+            elif (multiplemodels==["LR", "RFR"]) or (multiplemodels==["RFR","LR"]):
+                regensemble = VotingRegressor(estimators=[('rf', reg2), ('lr', reg3)])
+                r2scorelist=[]
+                i=2
+                lenofX=len(df2.drop(selectedtarget,axis=1).columns)
+                while i<=lenofX:
+                    X_new = SelectKBest(score_func=f_regression, k=i).fit_transform(X, y)
+                    X_new.shape
+                    X_train, X_test, y_train, y_test = train_test_split(X_new, y, test_size = 0.2, random_state = 0)
+                    ereg = regensemble.fit(X_train, y_train)
+                    y_pred = ereg.predict(X_test)
+                    r2scorelist.append(r2_score(y_test, y_pred))
+                    i=i+1
+                largestr2=max(r2scorelist)
+                print(r2scorelist.index(largestr2))
+                Optimalk=r2scorelist.index(largestr2) + 2
+                print(Optimalk)
+                X_new = SelectKBest(score_func=f_regression, k=Optimalk).fit_transform(X, y)
+                print(X_new[0])
+                print(X[0])
+                firstrow=X[0].tolist()
+                print(type(X[0]))
+                Xcolumns=[]
+                for col in Xfeature.columns:
+                    Xcolumns.append(col)
+                print(Xcolumns)
+                featurelist=[]
+                for element in X_new[0]:
+                    print(firstrow.index(element))
+                    featurelist.append(Xcolumns[firstrow.index(element)])
+                print(featurelist)
+                # Predicting model 
+                X_train, X_test, y_train, y_test = train_test_split(X_new, y, test_size = 0.2, random_state = 0)
+                ereg = regensemble.fit(X_train, y_train)
+                y_pred = ereg.predict(X_test)
+                
+                columnpredicted=selectedtarget
+                
+                # Make new Dictionary to sore in database
+                regressionmodel={}
+                regressionmodel["columnpredicted"]=columnpredicted
+                regressionmodel["Ensemble"]="Yes"
+                regressionmodel["Type"]="Voting Regressor"
+                regressionmodel["Estimators"]=["RandomForestRegressor","LinearRegression"]
+                regressionmodel["numfeatures"]=Optimalk
+                regressionmodel["featurenames"]=featurelist
+                regressionmodel["featureselection"]=["Variance Threshlod","Univariate Selection"]
+                # Metrics
+                regressionmodel["Explained Variance Score"]=explained_variance_score(y_test, y_pred)
+                regressionmodel["MeanAbsoluteError"]=mean_absolute_error(y_test, y_pred)
+                regressionmodel["MeanSquaredError"]=mean_squared_error(y_test, y_pred)
+                regressionmodel["RootMeanSquaredError"]=mean_squared_error(y_test, y_pred, squared=False)
+                regressionmodel["MeanSquaredLogError"]=mean_squared_log_error(y_test, y_pred)
+                regressionmodel["MedianAbsoluteError"]=median_absolute_error(y_test, y_pred)
+            elif (multiplemodels==["LR", "GBR"]) or (multiplemodels==["GBR","LR"]):
+                regensemble = VotingRegressor(estimators=[('gb', reg1), ('lr', reg3)])
+                r2scorelist=[]
+                i=2
+                lenofX=len(df2.drop(selectedtarget,axis=1).columns)
+                while i<=lenofX:
+                    X_new = SelectKBest(score_func=f_regression, k=i).fit_transform(X, y)
+                    X_new.shape
+                    X_train, X_test, y_train, y_test = train_test_split(X_new, y, test_size = 0.2, random_state = 0)
+                    ereg = regensemble.fit(X_train, y_train)
+                    y_pred = ereg.predict(X_test)
+                    r2scorelist.append(r2_score(y_test, y_pred))
+                    i=i+1
+                largestr2=max(r2scorelist)
+                print(r2scorelist.index(largestr2))
+                Optimalk=r2scorelist.index(largestr2) + 2
+                print(Optimalk)
+                X_new = SelectKBest(score_func=f_regression, k=Optimalk).fit_transform(X, y)
+                print(X_new[0])
+                print(X[0])
+                firstrow=X[0].tolist()
+                print(type(X[0]))
+                Xcolumns=[]
+                for col in Xfeature.columns:
+                    Xcolumns.append(col)
+                print(Xcolumns)
+                featurelist=[]
+                for element in X_new[0]:
+                    print(firstrow.index(element))
+                    featurelist.append(Xcolumns[firstrow.index(element)])
+                print(featurelist)
+                # Predicting model 
+                X_train, X_test, y_train, y_test = train_test_split(X_new, y, test_size = 0.2, random_state = 0)
+                ereg = regensemble.fit(X_train, y_train)
+                y_pred = ereg.predict(X_test)
+                
+                columnpredicted=selectedtarget
+                
+                # Make new Dictionary to sore in database
+                regressionmodel={}
+                regressionmodel["columnpredicted"]=columnpredicted
+                
+                regressionmodel["Ensemble"]="Yes"
+                regressionmodel["Type"]="Voting Regressor"
+                regressionmodel["Estimators"]=["GradientBoostingRegressor","LinearRegression"]
+                regressionmodel["numfeatures"]=Optimalk
+                regressionmodel["featurenames"]=featurelist
+                regressionmodel["featureselection"]=["Variance Threshlod","Univariate Selection"]
+                # Metrics
+                regressionmodel["Explained Variance Score"]=explained_variance_score(y_test, y_pred)
+                regressionmodel["MeanAbsoluteError"]=mean_absolute_error(y_test, y_pred)
+                regressionmodel["MeanSquaredError"]=mean_squared_error(y_test, y_pred)
+                regressionmodel["RootMeanSquaredError"]=mean_squared_error(y_test, y_pred, squared=False)
+                regressionmodel["MeanSquaredLogError"]=mean_squared_log_error(y_test, y_pred)
+                regressionmodel["MedianAbsoluteError"]=median_absolute_error(y_test, y_pred)
+            
+        # Create data for comparison plot
+        dataforcomparisonplot=[]
+        for featureindex in range(1,lenofX-1):
+            valueofk=featureindex+1
+            valueofscore=clf1r2scorelist[featureindex]
+            dataforcomparisonplot.append({"k":valueofk,"value":valueofscore,"category":"GradientBoostingRegressor"})
+        
+        for featureindex in range(1,lenofX-1):
+            valueofk=featureindex+1
+            valueofscore=clf2r2scorelist[featureindex]
+            dataforcomparisonplot.append({"k":valueofk,"value":valueofscore,"category":"RandomForestRegressor"})
+        
+        for featureindex in range(1,lenofX-1):
+            valueofk=featureindex+1
+            valueofscore=clf3r2scorelist[featureindex]
+            dataforcomparisonplot.append({"k":valueofk,"value":valueofscore,"category":"LinearRegression"})
+        
+
+        for featureindex in range(1,lenofX-1):
+            valueofk=featureindex+1
+            valueofscore=r2scorelist[featureindex]
+            dataforcomparisonplot.append({"k":valueofk,"value":valueofscore,"category":"Ensemble"})
+            
+        regressionmodel["dataforcomparisonplot"]=dataforcomparisonplot
+        # Store Updated dictionary in database
+        db_cm2.remove()
+        #
+       
+        #
+        data_dict = df2.to_dict("records")
+        s1=df2.to_csv(index=False)
+        db_cm2.insert({"User":"Smit","data":data_dict,"s":s1,"regressionmodel":regressionmodel},check_keys=False)
+    return a
+
+
 @app.route("/fetch_regressionmodel", methods=['GET']) 
 @cross_origin()
 def fetchregressionmodel():
