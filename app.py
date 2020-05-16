@@ -118,6 +118,39 @@ def uploaddataset():
         #return jsonify({'df1' : df1})
     return a
 
+@app.route("/execute_dropcolumns", methods=['POST']) 
+@cross_origin()
+def executedropcolumnsoperation():
+    if request.method=="POST":
+        if request.files:
+            print("ABCDEF")
+        data = request.get_json(silent=True)
+        item = {'values': data.get('values')}
+        print(item)
+        a="Successfully Submitted in Flask"
+        mng_client2 = pymongo.MongoClient("mongodb+srv://expertron:smitenter@cluster0-dpwn4.mongodb.net/test?retryWrites=true&w=majority")
+        mng_db2 = mng_client2['ampleai'] 
+        collection_name2 = 'csv' 
+        db_cm2 = mng_db2[collection_name2]
+        data_from_db = db_cm2.find_one({"User":"Smit"})
+        
+        dictfromdatabase=data_from_db["data"]
+        df2=pd.DataFrame.from_dict(dictfromdatabase)
+        print(df2.head())
+        deletecolumns=item["values"]["select-multiple"]
+        
+        df2=df2.drop(deletecolumns,axis=1) 
+       
+        db_cm2.remove()
+        #
+       
+        #
+        data_dict = df2.to_dict("records")
+        s1=df2.to_csv(index=False)
+        db_cm2.insert({"User":"Smit","data":data_dict,"s":s1},check_keys=False)
+    return a
+
+
 @app.route("/fetch_csv", methods=['GET']) 
 @cross_origin()
 def fetchdataset():
